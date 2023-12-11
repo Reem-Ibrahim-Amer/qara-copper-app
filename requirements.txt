@@ -13,3 +13,4 @@ tensorflow
 statsmodels
 plotly
 yfinance
+scikit-learn
