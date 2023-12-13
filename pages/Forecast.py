@@ -9,113 +9,66 @@ from datetime import date
 import torch
 import torch.nn as nn
 from PIL import Image
+from datetime import timedelta
+from keras.models import load_model
 
 
-
-class LSTM(nn.Module):
-  def __init__(self, input_size, hidden_size, num_stacked_layers):
-      super().__init__()
-      self.hidden_size = hidden_size
-      self.num_stacked_layers = num_stacked_layers
-
-      self.lstm = nn.LSTM(input_size, hidden_size, num_stacked_layers,
-                          batch_first=True)
-
-      self.fc = nn.Linear(hidden_size, 1)
-
-  def forward(self, x):
-      batch_size = x.size(0)
-      h0 = torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size)
-      c0 = torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size)
-
-      out, _ = self.lstm(x, (h0, c0))
-      out = self.fc(out[:, -1, :])
-      return out
 def main():
-  model_file_path = 'model.pt'
-  model = torch.load(model_file_path)
-  image = Image.open('qara_logo.png')
-  st.image(image, caption='QARA Data Science', use_column_width=True)
+  image1 = Image.open('open prediction.png')
+  image2 = Image.open('close prediction.png')
+  #st.image(image, caption='QARA Data Science', use_column_width=True)
   st.title("Copper AI Forecasting App")
   st.write("Forecasting of Copper Prices using LSTM Neural Network")
 
-  st.image('price_prediction_plot.jpg', caption='Model Results', use_column_width=True)
-  df = pd.read_csv("final_merged_copper_dataset.csv")
-  df["Date"] = pd.to_datetime(df["Date"])
-  last_date = df['Date'].max().date()
+  col1, col2 = st.columns(2)
 
-  end_date = st.date_input('End date:', value=date(2023, 11, 30), key='end_date')
-  start_date = last_date+timedelta(days=1)
-  forecast_dates = pd.date_range(start=start_date, end=end_date, freq='B')  # 'B' excludes weekends
+  with col1:
+    st.image(image1, caption='Open Prediction Image', use_column_width=True)
 
-  # Create a DataFrame with the date column
-  forecast_set = pd.DataFrame({'Date': forecast_dates})
-  forecast_set['Date'] = pd.to_datetime(forecast_set['Date'])
+  with col2:
+    st.image(image2, caption='Close Prediction Image', use_column_width=True)
+  last_Dates = np.load('last_Dates.npy', allow_pickle=True)
+  last_actual_date = last_Dates[-1][0]
 
-  stacked_np = np.load('stacked_np.npy')
-  shifted_df = pd.read_csv('shifted_df.csv')
-  shifted_df = shifted_df.drop(['Date'], axis=1)
-  shifted_df = shifted_df.astype(float)
+  forecast_end_date = st.date_input(f'End date:', value=datetime.now().date(), key='end_date')
+  start_date = last_actual_date+timedelta(days=1)
+    
+# Calculate the difference in days
+# -------------------------------------
+  time_difference = forecast_end_date - start_date.date()
 
-  shifted_df_as_np_flipped = np.fliplr(stacked_np)
+  # Extract the number of days from the timedelta object
+  days_difference = time_difference.days
 
-  shifted_df_as_tensor = torch.tensor(shifted_df_as_np_flipped.copy())
-  torch.set_printoptions(precision=6)
-  last = shifted_df_as_tensor[-1][1:]
-  last = last.unsqueeze(0).unsqueeze(-1)
+  forecast_df = pd.DataFrame(columns = ['Open','Close'], index =pd.date_range(start=start_date.date(), periods=days_difference+1, freq='B'))
 
-  shifted_df_no_date = shifted_df.copy()
+# Prediction
+# -------------------------------------
+  model = load_model('model.h5')
+  x_seq =np.load('last_sequences_rows.npy',allow_pickle=True)
+  y_labels = np.load('last_label_rows.npy',allow_pickle=True)
+  curr_row_seq = np.append(x_seq[-1][1:],(y_labels[-1])).reshape((1,50,2))
 
-  prices_scaler = joblib.load('prices_scaler.pkl')
-  LOOKBACK = 15
-  for i in range(forecast_dates.shape[0]):
-      last = shifted_df_as_tensor[-1][1:]
-      last = last.unsqueeze(0).unsqueeze(-1).float()
-      with torch.no_grad():
-          predicted = model(last).numpy()
-      row = torch.cat([shifted_df_as_tensor[-1][1:], torch.tensor(predicted).reshape(1)], dim=0).unsqueeze(0)
-      quick_reverse = prices_scaler.inverse_transform(row[:, 5:].to('cpu').numpy())
-      new_row = {'Price': quick_reverse[0][LOOKBACK],
-                  'Price(t-1)': quick_reverse[0][LOOKBACK - 1],
-                  'Price(t-2)': quick_reverse[0][LOOKBACK - 2],
-                  'Price(t-3)': quick_reverse[0][LOOKBACK - 3],
-                  'Price(t-4)': quick_reverse[0][LOOKBACK - 4],
-                  'Price(t-5)': quick_reverse[0][LOOKBACK - 5],
-                  'Price(t-6)': quick_reverse[0][LOOKBACK - 6],
-                  'Price(t-7)': quick_reverse[0][LOOKBACK - 7],
-                  'Price(t-8)': quick_reverse[0][LOOKBACK - 8],
-                  'Price(t-9)': quick_reverse[0][LOOKBACK - 9],
-                  'Price(t-10)': quick_reverse[0][LOOKBACK - 10],
-                  'Price(t-11)': quick_reverse[0][LOOKBACK - 11],
-                  'Price(t-12)': quick_reverse[0][LOOKBACK - 12],
-                  'Price(t-13)': quick_reverse[0][LOOKBACK - 13],
-                  'Price(t-14)': quick_reverse[0][LOOKBACK - 14],
-                  'Price(t-15)': quick_reverse[0][LOOKBACK - 15],
-                  'Real_GDP': df.iloc[-1]["Real_GDP"],
-                  'CPI': df.iloc[-1]["CPI"],
-                  'inflation_rate': df.iloc[-1]["inflation_rate"],
-                  'PALLFNFINDEXM': df.iloc[-1]["PALLFNFINDEXM"],
-                  'DEXCHUS': df.iloc[-1]["DEXCHUS"]
-                  }
-      shifted_df_as_tensor = torch.cat((shifted_df_as_tensor, row), dim=0)
-      shifted_df_no_date = shifted_df_no_date._append(new_row, ignore_index=True)
-
-  final_set = prices_scaler.inverse_transform(shifted_df_as_tensor[:,5:].to('cpu').numpy())
-  display_df = pd.DataFrame(shifted_df_no_date["Price"])
-  display_df = display_df.iloc[6037:]
-  display_df = display_df.reset_index(drop=True)
-  forecast_set = pd.concat([forecast_set, display_df],axis=1)
-
+  if len(forecast_df)>0:
+    for i in range(0,days_difference+1):
+      up_pred = model.predict(curr_row_seq)
+      forecast_df.iloc[i] = up_pred[0]
+      curr_row_seq = np.append(curr_row_seq[0][1:],up_pred,axis=0)
+      curr_row_seq = curr_row_seq.reshape(x_seq[-1:].shape)
+    
+    # Inverse Scale data
+    MMS = joblib.load('copper_price_scaler.pkl')
+    forecast_df[['Open','Close']] = MMS.inverse_transform(forecast_df[['Open','Close']])
 
   # Display the date input to the user.
   st.write('Start date:', start_date)
-  st.write('End date:', end_date)
+  st.write('End date:', forecast_end_date)
 
 
 
   # Button to make predictions
   if st.button("Generate Prediction"):
-    st.dataframe(forecast_set)  # Same as st.write(df)
+    st.write(forecast_df)  # Same as st.write(df)
 
 if __name__ == "__main__":
   main()
