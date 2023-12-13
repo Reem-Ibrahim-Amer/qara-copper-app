@@ -10,8 +10,6 @@ import datetime
 
 st.markdown('<center><h1 style="color:#FC5E22">Copper Dashboard</h2></center>', unsafe_allow_html=True)
 
-df = pd.read_csv("final_merged_copper_dataset.csv")
-
 # Current copper price
 msft = yf.Ticker("HG=F") # copper code
 current_data = msft.history(period="1mo")
