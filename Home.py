@@ -7,7 +7,11 @@ import plotly.express as px
 import yfinance as yf
 import datetime
 from datetime import datetime as dt
+from PIL import Image
 
+
+image = Image.open('qara_logo.png')
+st.image(image, caption='QARA Data Science', use_column_width=True)
 st.markdown('<center><h1 style="color:#FC5E22">Copper Futures Forecasting App</h2></center>', unsafe_allow_html=True)
 
 # Current copper price
