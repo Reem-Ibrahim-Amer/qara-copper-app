@@ -14,7 +14,7 @@ def calculate_price(mass, unit, rate_per_kg=5.0):
 
     return price
 
-st.markdown('<center><h1 style="color:#FC5E22">Mass-Based Copper Price Calculator</h2></center>', unsafe_allow_html=True)
+st.markdown("""<center><h1 style="color:#FC5E22">Today's Copper Price Calculator</h2></center>""", unsafe_allow_html=True)
 
 # User inputs
 mass = st.number_input("Enter the mass:", min_value=0.0, step=0.1)

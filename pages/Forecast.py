@@ -2,6 +2,7 @@ import streamlit as st
 st.set_page_config(page_title="Qara", page_icon=":rocket:")
 import pandas as pd
 import numpy as np
+import plotly.express as px
 import joblib
 from datetime import datetime, timedelta
 import streamlit as st
@@ -14,25 +15,17 @@ from keras.models import load_model
 
 
 def main():
-  image1 = Image.open('open prediction.png')
-  image2 = Image.open('close prediction.png')
-  #st.image(image, caption='QARA Data Science', use_column_width=True)
-  st.title("Copper AI Forecasting App")
-  st.write("Forecasting of Copper Prices using LSTM Neural Network")
 
-  col1, col2 = st.columns(2)
+  st.markdown("""<center><h1 style="color:#FC5E22">AI Copper Forecasting</h2></center>""", unsafe_allow_html=True)
+  st.write("Our state-of-the-art AI technology is dedicated to providing accurate and insightful predictions for copper futures prices.")
 
-  with col1:
-    st.image(image1, caption='Open Prediction Image', use_column_width=True)
-
-  with col2:
-    st.image(image2, caption='Close Prediction Image', use_column_width=True)
   last_Dates = np.load('last_Dates.npy', allow_pickle=True)
-  last_actual_date = last_Dates[-1][0]
+  last_Dates=last_Dates.reshape(len(last_Dates))
+  last_actual_date = last_Dates[-1]
 
-  forecast_end_date = st.date_input(f'End date:', value=datetime.now().date(), key='end_date')
+  forecast_end_date = st.date_input(f'Select End date:', value=last_actual_date+timedelta(days=7), key='end_date')
   start_date = last_actual_date+timedelta(days=1)
-    
+
 # Calculate the difference in days
 # -------------------------------------
   time_difference = forecast_end_date - start_date.date()
@@ -55,7 +48,7 @@ def main():
       forecast_df.iloc[i] = up_pred[0]
       curr_row_seq = np.append(curr_row_seq[0][1:],up_pred,axis=0)
       curr_row_seq = curr_row_seq.reshape(x_seq[-1:].shape)
-    
+
     # Inverse Scale data
     MMS = joblib.load('copper_price_scaler.pkl')
     forecast_df[['Open','Close']] = MMS.inverse_transform(forecast_df[['Open','Close']])
@@ -63,12 +56,14 @@ def main():
   # Display the date input to the user.
   st.write('Start date:', start_date)
   st.write('End date:', forecast_end_date)
+  st.write(forecast_df)  # Same as st.write(df)
 
-
-
-  # Button to make predictions
-  if st.button("Generate Prediction"):
-    st.write(forecast_df)  # Same as st.write(df)
+# ---------------------------------visualizing Data--------------------------------------------------------
+  last_two_weeks = pd.DataFrame(MMS.inverse_transform(y_labels[-14:]),columns = ['Open','Close'], index =last_Dates[-14:])
+  #st.write(last_two_weeks)
+  hist_and_future = pd.concat([last_two_weeks,forecast_df],axis=0)
+  fig = px.line(hist_and_future, x=hist_and_future.index, y=['Open','Close'], title='Copper Prices')
+  st.plotly_chart(fig, theme="streamlit", use_container_width=True)
 
 if __name__ == "__main__":
   main()
