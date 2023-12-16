@@ -1,1 +1,1 @@
-web: sh setup.sh && streamlit run Dashboar.py
+web: streamlit run your_app.py
